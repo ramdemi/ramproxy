@@ -2,8 +2,8 @@ var http = require('http');
 var https = require('https');
 var config = require("./config");
 var url = require("url");
-var request = require("request");
-var cluster = require('cluster');
+var request = require("axios");
+//var cluster = require('cluster');
 var throttle = require("tokenthrottle")({rate: config.max_requests_per_second});
 
 http.globalAgent.maxSockets = Infinity;
@@ -44,7 +44,7 @@ function writeResponse(res, httpCode, body) {
 }
 
 function sendInvalidURLResponse(res) {
-    return writeResponse(res, 404, "url must be in the form of /fetch/{some_url_here}");
+    return writeResponse(res, 404, "url must be in the form of /fetch?remurl={some_url_here}");
 }
 
 function sendTooBigResponse(res) {
@@ -71,7 +71,6 @@ function processRequest(req, res) {
         var tmp = unescape(result[1]);
         result[1] = tmp;
         if(!tmp.includes("://")) result[1] = tmp.replace(":/","://");
-        console.log(result[1]);
         
         try {
             remoteURL = url.parse(decodeURI(result[1]));
@@ -113,16 +112,33 @@ function processRequest(req, res) {
         // Remove origin and referer headers. TODO: This is a bit naughty, we should remove at some point.
         delete req.headers["origin"];
         delete req.headers["referer"];
+        var proxyResponseSize = 0;
 
         var proxyRequest = request({
             url: remoteURL,
             headers: req.headers,
             method: req.method,
             timeout: config.proxy_request_timeout_ms,
+            decompress: false,
+            responseType: 'stream',
             strictSSL: false
-        });
-
-        proxyRequest.on('error', function (err) {
+        })
+            .then(function (response) {
+                let tnum=0;
+                if (response.headers["content-length"]) tnum = response.headers["content-length"];
+                proxyResponseSize = parseInt(tnum);
+                for (const key in response.headers) {
+                    if (response.headers.hasOwnProperty(key)) {
+                        const element = response.headers[key];
+                        res.setHeader(key, element);
+                    }
+                }
+                if (proxyResponseSize >= config.max_request_length) {
+                    return sendTooBigResponse(res);
+                  }
+                response.data.pipe(res);
+            })
+            .catch(function(err) {
 
             if (err.code === "ENOTFOUND") {
                 return writeResponse(res, 502, "Host for " + url.format(remoteURL) + " cannot be found.")
@@ -132,33 +148,6 @@ function processRequest(req, res) {
                 return writeResponse(res, 500);
             }
 
-        });
-
-        var requestSize = 0;
-        var proxyResponseSize = 0;
-
-        req.pipe(proxyRequest).on('data', function (data) {
-
-            requestSize += data.length;
-
-            if (requestSize >= config.max_request_length) {
-                proxyRequest.end();
-                return sendTooBigResponse(res);
-            }
-        }).on('error', function(err){
-            writeResponse(res, 500, "Stream Error");
-        });
-
-        proxyRequest.pipe(res).on('data', function (data) {
-
-            proxyResponseSize += data.length;
-
-            if (proxyResponseSize >= config.max_request_length) {
-                proxyRequest.end();
-                return sendTooBigResponse(res);
-            }
-        }).on('error', function(err){
-            writeResponse(res, 500, "Stream Error");
         });
     }
     else {
@@ -173,7 +162,7 @@ function processRequest(req, res) {
 }
 else
 {*/
-const server =    http.createServer(function (req, res) {
+const server = http.createServer(function (req, res) {
 
         // Process AWS health checks
         if (req.url === "/health") {
@@ -204,6 +193,6 @@ const server =    http.createServer(function (req, res) {
 
     }).listen(config.port);
 
-    console.log("thingproxy.freeboard.io process started (PID " + process.pid + ")");
+    console.log("ramproxy.vercel.app process started (PID " + process.pid + ")");
 //}
 module.exports = server;
