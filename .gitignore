@@ -34,3 +34,6 @@ node_modules
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
+.vs/slnx.sqlite
+.vs/thingproxy/v16/.suo
+.vs/VSWorkspaceState.json
