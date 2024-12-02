@@ -6,8 +6,8 @@
   "author": "Jim Heising <jim@buglabs.net>",
   "license": "MIT",
   "dependencies": {
-    "axios": "^0.21.1",
+    "axios": "^1.7.8",
     "public-address": "^0.1.2",
-    "tokenthrottle": "^1.1.0"
+    "tokenthrottle": "^1.3.0"
   }
 }
