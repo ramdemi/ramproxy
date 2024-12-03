@@ -191,7 +191,8 @@ const server = http.createServer(function (req, res) {
             processRequest(req, res);
         }
 
-    }).listen(config.port);
+    });
+    server.listen(config.port);
 
     console.log("ramproxy.vercel.app process started (PID " + process.pid + ")");
 //}
